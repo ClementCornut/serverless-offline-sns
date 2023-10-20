@@ -1,5 +1,5 @@
 import { v4 as uuid } from "uuid";
-import { MessageAttributes } from "./types";
+import { MessageAttributes } from "./types.js";
 
 export function createAttr() {
   return {
@@ -35,9 +35,7 @@ export function parseMessageAttributes(body) {
   const entries = Object.keys(body)
     .filter((key) => key.startsWith("MessageAttributes.entry"))
     .reduce((prev, key) => {
-      const index = key
-        .replace("MessageAttributes.entry.", "")
-        .match(/.*?(?=\.|$)/i)[0];
+      const index = key.replace("MessageAttributes.entry.", "").match(/.*?(?=\.|$)/i)[0];
       return prev.includes(index) ? prev : [...prev, index];
     }, []);
   return entries
@@ -47,9 +45,7 @@ export function parseMessageAttributes(body) {
         ...prev,
         [`${body[`${baseKey}.Name`]}`]: {
           Type: body[`${baseKey}.Value.DataType`],
-          Value:
-            body[`${baseKey}.Value.BinaryValue`] ||
-            body[`${baseKey}.Value.StringValue`],
+          Value: body[`${baseKey}.Value.BinaryValue`] || body[`${baseKey}.Value.StringValue`],
         },
       }),
       {}
@@ -60,9 +56,7 @@ export function parseAttributes(body) {
   const indices = Object.keys(body)
     .filter((key) => key.startsWith("Attributes.entry"))
     .reduce((prev, key) => {
-      const index = key
-        .replace("Attributes.entry.", "")
-        .match(/.*?(?=\.|$)/i)[0];
+      const index = key.replace("Attributes.entry.", "").match(/.*?(?=\.|$)/i)[0];
       return prev.includes(index) ? prev : [...prev, index];
     }, []);
   const attrs = {};
@@ -153,12 +147,9 @@ export const topicNameFromArn = (arn) => {
   return arnParts[arnParts.length - 1];
 };
 
-export const topicArnFromName = (name, region, accountId) =>
-  `arn:aws:sns:${region}:${accountId}:${name}`;
+export const topicArnFromName = (name, region, accountId) => `arn:aws:sns:${region}:${accountId}:${name}`;
 
-export const formatMessageAttributes = (
-  messageAttributes: MessageAttributes
-) => {
+export const formatMessageAttributes = (messageAttributes: MessageAttributes) => {
   const newMessageAttributes = {};
   for (const [key, value] of Object.entries(messageAttributes)) {
     newMessageAttributes[key] = {

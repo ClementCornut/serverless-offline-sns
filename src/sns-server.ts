@@ -1,8 +1,6 @@
-import { SQS } from "aws-sdk";
-import { TopicsList, Subscription } from "aws-sdk/clients/sns";
 import fetch from "node-fetch";
 import { URL } from "url";
-import { IDebug, ISNSServer } from "./types";
+import { IDebug, ISNSServer } from "./types.js";
 import * as bodyParser from "body-parser";
 import * as _ from "lodash";
 import * as xml from "xml";
@@ -17,10 +15,12 @@ import {
   validatePhoneNumber,
   topicArnFromName,
   formatMessageAttributes,
-} from "./helpers";
+} from "./helpers.js";
+import { Subscription, Topic } from "@aws-sdk/client-sns";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 
 export class SNSServer implements ISNSServer {
-  private topics: TopicsList;
+  private topics: Topic[];
   private subscriptions: Subscription[];
   private pluginDebug: IDebug;
   private port: number;
@@ -45,10 +45,7 @@ export class SNSServer implements ISNSServer {
     this.app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" })); // for parsing application/x-www-form-urlencoded
     this.app.use((req, res, next) => {
       res.header("Access-Control-Allow-Origin", "*");
-      res.header(
-        "Access-Control-Allow-Headers",
-        "Origin, X-Requested-With, Content-Type, Accept"
-      );
+      res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
       next();
     });
     this.app.all("/", (req, res) => {
@@ -56,9 +53,7 @@ export class SNSServer implements ISNSServer {
       this.debug(JSON.stringify(req.body));
       this.debug(JSON.stringify(this.subscriptions));
       if (req.body.Action === "ListSubscriptions") {
-        this.debug(
-          "sending: " + xml(this.listSubscriptions(), { indent: "\t" })
-        );
+        this.debug("sending: " + xml(this.listSubscriptions(), { indent: "\t" }));
         res.send(xml(this.listSubscriptions()));
       } else if (req.body.Action === "ListTopics") {
         this.debug("sending: " + xml(this.listTopics(), { indent: "\t" }));
@@ -66,16 +61,7 @@ export class SNSServer implements ISNSServer {
       } else if (req.body.Action === "CreateTopic") {
         res.send(xml(this.createTopic(req.body.Name)));
       } else if (req.body.Action === "Subscribe") {
-        res.send(
-          xml(
-            this.subscribe(
-              req.body.Endpoint,
-              req.body.Protocol,
-              req.body.TopicArn,
-              req.body
-            )
-          )
-        );
+        res.send(xml(this.subscribe(req.body.Endpoint, req.body.Protocol, req.body.TopicArn, req.body)));
       } else if (req.body.Action === "Publish") {
         const target = this.extractTarget(req.body);
         if (req.body.MessageStructure === "json") {
@@ -169,9 +155,7 @@ export class SNSServer implements ISNSServer {
   public unsubscribe(arn) {
     this.debug(JSON.stringify(this.subscriptions));
     this.debug("unsubscribing: " + arn);
-    this.subscriptions = this.subscriptions.filter(
-      (sub) => sub.SubscriptionArn !== arn
-    );
+    this.subscriptions = this.subscriptions.filter((sub) => sub.SubscriptionArn !== arn);
     return {
       UnsubscribeResponse: [createAttr(), createMetadata()],
     };
@@ -202,13 +186,10 @@ export class SNSServer implements ISNSServer {
 
   public subscribe(endpoint, protocol, arn, body) {
     const attributes = parseAttributes(body);
-    const filterPolicies =
-      attributes["FilterPolicy"] && JSON.parse(attributes["FilterPolicy"]);
+    const filterPolicies = attributes["FilterPolicy"] && JSON.parse(attributes["FilterPolicy"]);
     arn = this.convertPseudoParams(arn);
     const existingSubscription = this.subscriptions.find((subscription) => {
-      return (
-        subscription.Endpoint === endpoint && subscription.TopicArn === arn
-      );
+      return subscription.Endpoint === endpoint && subscription.TopicArn === arn;
     });
     let subscriptionArn;
     if (!existingSubscription) {
@@ -255,12 +236,7 @@ export class SNSServer implements ISNSServer {
         attrs = [messageAttrs[k].Value];
       }
       if (_.intersection(v as unknown[], attrs).length > 0) {
-        this.debug(
-          "filterPolicy Passed: " +
-            v +
-            " matched message attrs: " +
-            JSON.stringify(attrs)
-        );
+        this.debug("filterPolicy Passed: " + v + " matched message attrs: " + JSON.stringify(attrs));
         shouldSend = true;
       } else {
         shouldSend = false;
@@ -283,11 +259,10 @@ export class SNSServer implements ISNSServer {
     return fetch(sub.Endpoint, {
       method: "POST",
       body: event,
-      timeout: 0,
       headers: {
         "x-amz-sns-rawdelivery": "" + raw,
         "Content-Type": "text/plain; charset=UTF-8",
-        "Content-Length": Buffer.byteLength(event),
+        "Content-Length": Buffer.byteLength(event).toString(),
       },
     })
       .then((res) => this.debug(res))
@@ -297,54 +272,42 @@ export class SNSServer implements ISNSServer {
   private publishSqs(event, sub, messageAttributes, messageGroupId) {
     const subEndpointUrl = new URL(sub.Endpoint);
     const sqsEndpoint = `${subEndpointUrl.protocol}//${subEndpointUrl.host}/`;
-    const sqs = new SQS({ endpoint: sqsEndpoint, region: this.region });
+    const sqs = new SQSClient({ endpoint: sqsEndpoint, region: this.region });
 
     if (sub["Attributes"]["RawMessageDelivery"] === "true") {
-      return sqs
-        .sendMessage({
+      return sqs.send(
+        new SendMessageCommand({
           QueueUrl: sub.Endpoint,
           MessageBody: event,
           MessageAttributes: formatMessageAttributes(messageAttributes),
           ...(messageGroupId && { MessageGroupId: messageGroupId }),
         })
-        .promise();
+      );
     } else {
       const records = JSON.parse(event).Records ?? [];
       const messagePromises = records.map((record) => {
-        return sqs
-          .sendMessage({
+        return sqs.send(
+          new SendMessageCommand({
             QueueUrl: sub.Endpoint,
             MessageBody: JSON.stringify(record.Sns),
             MessageAttributes: formatMessageAttributes(messageAttributes),
             ...(messageGroupId && { MessageGroupId: messageGroupId }),
           })
-          .promise();
+        );
       });
       return Promise.all(messagePromises);
     }
   }
 
-  public publish(
-    topicArn,
-    subject,
-    message,
-    messageStructure,
-    messageAttributes,
-    messageGroupId
-  ) {
+  public publish(topicArn, subject, message, messageStructure, messageAttributes, messageGroupId) {
     const messageId = createMessageId();
     Promise.all(
       this.subscriptions
         .filter((sub) => sub.TopicArn === topicArn)
         .map((sub) => {
           const isRaw = sub["Attributes"]["RawMessageDelivery"] === "true";
-          if (
-            sub["Policies"] &&
-            !this.evaluatePolicies(sub["Policies"], messageAttributes)
-          ) {
-            this.debug(
-              "Filter policies failed. Skipping subscription: " + sub.Endpoint
-            );
+          if (sub["Policies"] && !this.evaluatePolicies(sub["Policies"], messageAttributes)) {
+            this.debug("Filter policies failed. Skipping subscription: " + sub.Endpoint);
             return;
           }
           this.debug("fetching: " + sub.Endpoint);
@@ -374,16 +337,9 @@ export class SNSServer implements ISNSServer {
             return this.publishHttp(event, sub, isRaw);
           }
           if (protocol === "sqs") {
-            return this.publishSqs(
-              event,
-              sub,
-              messageAttributes,
-              messageGroupId
-            );
+            return this.publishSqs(event, sub, messageAttributes, messageGroupId);
           }
-          throw new Error(
-            `Protocol '${protocol}' is not supported by serverless-offline-sns`
-          );
+          throw new Error(`Protocol '${protocol}' is not supported by serverless-offline-sns`);
         })
     );
     return {

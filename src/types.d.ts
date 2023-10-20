@@ -3,7 +3,7 @@ import {
   CreateTopicResponse,
   PublishResponse,
   ListTopicsResponse,
-} from "aws-sdk/clients/sns.d";
+} from "aws-sdk/clients/sns.js";
 
 export type IDebug = (msg: any, stack?: any) => void;
 
@@ -45,4 +45,3 @@ export interface IMessageAttribute {
   Type: string;
   Value: string;
 }
-

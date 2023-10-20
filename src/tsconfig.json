@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
     "allowJs": true,
-    "target": "es5",
-    "module": "commonjs",
+    "target": "ESNext",
+    "module": "NodeNext",
     "outDir": "../dist",
-    "lib": ["es5", "es2015.promise", "es2017", "es2017.object", "dom"],
+    "lib": ["ESNext", "dom"],
+    "moduleResolution": "NodeNext",
     "allowUnreachableCode": true,
     "noImplicitAny": false,
     "declaration": false

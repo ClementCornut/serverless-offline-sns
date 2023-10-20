@@ -1,0 +1,11 @@
+.serverless
+.yarn
+.gitignore
+.prettierignore
+yarn.lock
+yarn-error.log
+LICENSE
+dist
+coverage
+*.yml
+*.html
