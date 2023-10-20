@@ -2,15 +2,17 @@ import {
   SNSClient,
   ListTopicsCommand,
   ListSubscriptionsCommand,
-  ListSubscriptionsResponse,
   ListTopicsResponse,
   UnsubscribeCommand,
   CreateTopicCommand,
   SubscribeCommand,
   PublishCommand,
   PublishInput,
+  ListSubscriptionsCommandOutput,
+  PublishCommandOutput,
+  ListTopicsCommandOutput,
 } from "@aws-sdk/client-sns";
-import * as _ from "lodash";
+import _ from "lodash";
 import fetch from "node-fetch";
 import { createMessageId, createSnsLambdaEvent } from "./helpers.js";
 import { IDebug, ISNSAdapter } from "./types.js";
@@ -57,7 +59,7 @@ export class SNSAdapter implements ISNSAdapter {
     });
   }
 
-  public async listTopics(): Promise<ListTopicsResponse> {
+  public async listTopics(): Promise<ListTopicsCommandOutput> {
     this.debug("listing topics");
 
     return new Promise((res) => {
@@ -72,10 +74,10 @@ export class SNSAdapter implements ISNSAdapter {
     });
   }
 
-  public async listSubscriptions(): Promise<ListSubscriptionsResponse> {
+  public async listSubscriptions(): Promise<ListSubscriptionsCommandOutput> {
     this.debug("listing subs");
 
-    return await new Promise((res) => {
+    return new Promise((res) => {
       this.sns.send(new ListSubscriptionsCommand({}), (err, subs) => {
         if (err) {
           this.debug(err, err.stack);
@@ -237,7 +239,7 @@ export class SNSAdapter implements ISNSAdapter {
     messageGroupId?: string
   ) {
     topicArn = this.convertPseudoParams(topicArn);
-    return await new Promise((resolve, reject) =>
+    return new Promise<PublishCommandOutput>((resolve, reject) =>
       this.sns.send(
         new PublishCommand({
           Message: message,
@@ -262,7 +264,7 @@ export class SNSAdapter implements ISNSAdapter {
     messageGroupId?: string
   ) {
     targetArn = this.convertPseudoParams(targetArn);
-    return await new Promise((resolve, reject) =>
+    return new Promise((resolve, reject) =>
       this.sns.send(
         new PublishCommand({
           Message: message,
@@ -285,7 +287,7 @@ export class SNSAdapter implements ISNSAdapter {
     messageAttributes: PublishInput["MessageAttributes"] = {},
     messageGroupId?: string
   ) {
-    return await new Promise((resolve, reject) =>
+    return new Promise((resolve, reject) =>
       this.sns.send(
         new PublishCommand({
           Message: message,

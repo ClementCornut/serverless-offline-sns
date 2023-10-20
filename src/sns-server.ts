@@ -1,9 +1,9 @@
 import fetch from "node-fetch";
 import { URL } from "url";
 import { IDebug, ISNSServer } from "./types.js";
-import * as bodyParser from "body-parser";
-import * as _ from "lodash";
-import * as xml from "xml";
+import _ from "lodash";
+import { default as xml } from "xml";
+import express from "express";
 import {
   arrayify,
   createAttr,
@@ -41,8 +41,8 @@ export class SNSServer implements ISNSServer {
 
   public routes() {
     this.debug("configuring route");
-    this.app.use(bodyParser.json({ limit: "10mb" })); // for parsing application/json
-    this.app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" })); // for parsing application/x-www-form-urlencoded
+    this.app.use(express.json({ limit: "10mb" })); // for parsing application/json
+    this.app.use(express.urlencoded({ extended: true, limit: "10mb" })); // for parsing application/x-www-form-urlencoded
     this.app.use((req, res, next) => {
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");

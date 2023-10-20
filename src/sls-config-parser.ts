@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import fs from "fs";
+import path from "path";
 import Serverless from "serverless";
 import findConfigPath from "serverless/lib/cli/resolve-configuration-path.js";
 

@@ -1,11 +1,10 @@
 import * as shell from "shelljs";
 import { SNSAdapter } from "./sns-adapter.js";
 import express, { type Express } from "express";
-import * as cors from "cors";
-import * as bodyParser from "body-parser";
+import cors from "cors";
 import { ISNSAdapter } from "./types.js";
 import { SNSServer } from "./sns-server.js";
-import * as _ from "lodash";
+import _ from "lodash";
 import { resolve } from "path";
 import { topicNameFromArn } from "./helpers.js";
 import { spawn } from "child_process";
@@ -42,12 +41,7 @@ export default class ServerlessOfflineSns {
       req.headers["content-type"] = req.headers["content-type"] || "text/plain";
       next();
     });
-    this.app.use(
-      bodyParser.json({
-        type: ["application/json", "text/plain"],
-        limit: "10mb",
-      })
-    );
+    this.app.use(express.json({ limit: "10MB", type: ["application/json", "text/plain"] }));
     this.options = options;
     this.serverless = serverless;
 
@@ -445,24 +439,24 @@ export default class ServerlessOfflineSns {
     return () => {
       // Options are passed from the command line in the options parameter
       // ### OLD: use the main serverless config since this behavior is already supported there
-      if (!this.options.skipCacheInvalidation || Array.isArray(this.options.skipCacheInvalidation)) {
-        for (const key in require.cache) {
-          // don't invalidate cached modules from node_modules ...
-          if (key.match(/node_modules/)) {
-            continue;
-          }
+      // if (!this.options.skipCacheInvalidation || Array.isArray(this.options.skipCacheInvalidation)) {
+      //   for (const key in require.cache) {
+      //     // don't invalidate cached modules from node_modules ...
+      //     if (key.match(/node_modules/)) {
+      //       continue;
+      //     }
 
-          // if an array is provided to the serverless config, check the entries there too
-          if (
-            Array.isArray(this.options.skipCacheInvalidation) &&
-            this.options.skipCacheInvalidation.find((pattern) => new RegExp(pattern).test(key))
-          ) {
-            continue;
-          }
+      //     // if an array is provided to the serverless config, check the entries there too
+      //     if (
+      //       Array.isArray(this.options.skipCacheInvalidation) &&
+      //       this.options.skipCacheInvalidation.find((pattern) => new RegExp(pattern).test(key))
+      //     ) {
+      //       continue;
+      //     }
 
-          delete require.cache[key];
-        }
-      }
+      //     delete require.cache[key];
+      //   }
+      // }
 
       this.debug(process.cwd());
       const handlerFnNameIndex = fn.handler.lastIndexOf(".");
