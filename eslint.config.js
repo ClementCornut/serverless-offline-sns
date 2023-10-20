@@ -24,7 +24,7 @@ export default [
       "@typescript-eslint": typescriptEslint,
       prettier,
     },
-    files: ["./src/**/*.ts"],
+    files: ["**/*.ts"],
     rules: {
       ...typescriptEslint.configs["eslint-recommended"].rules,
       ...typescriptEslint.configs["recommended-type-checked"].rules,
