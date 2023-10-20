@@ -1,5 +1,5 @@
 {
-  "name": "serverless-offline-sns",
+  "name": "@dyecode/serverless-offline-sns",
   "version": "1.0.0",
   "description": "Serverless plugin to run a local SNS server and call lambdas with events notifications.",
   "main": "dist/index.js",
