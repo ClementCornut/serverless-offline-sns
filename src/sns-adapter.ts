@@ -15,7 +15,7 @@ import {
 import _ from "lodash";
 import fetch from "node-fetch";
 import { createMessageId, createSnsLambdaEvent } from "./helpers.js";
-import { IDebug, ISNSAdapter } from "./types.js";
+import { IDebug, ISNSAdapter, SLSHandler } from "./types.js";
 
 export class SNSAdapter implements ISNSAdapter {
   private sns: SNSClient;
@@ -124,12 +124,12 @@ export class SNSAdapter implements ISNSAdapter {
   private sent: (data) => void;
   public Deferred = new Promise((res) => (this.sent = res));
 
-  public async subscribe(fn, getHandler, arn, snsConfig) {
+  public async subscribe(fn, getHandler: SLSHandler, arn, snsConfig) {
     arn = this.convertPseudoParams(arn);
     const subscribeEndpoint = this.baseSubscribeEndpoint + "/" + fn.name;
     this.debug("subscribe: " + fn.name + " " + arn);
     this.debug("subscribeEndpoint: " + subscribeEndpoint);
-    this.app.post("/" + fn.name, (req, res) => {
+    this.app.post("/" + fn.name, async (req, res) => {
       this.debug("calling fn: " + fn.name + " 1");
       const oldEnv = _.extend({}, process.env);
       process.env = _.extend({}, process.env, fn.environment);
@@ -165,7 +165,7 @@ export class SNSAdapter implements ISNSAdapter {
           this.sent(response);
         }
       };
-      const maybePromise = getHandler()(event, this.createLambdaContext(fn, sendIt), sendIt);
+      const maybePromise = (await getHandler())(event, this.createLambdaContext(fn, sendIt), sendIt);
       if (maybePromise && maybePromise.then) {
         maybePromise.then((response) => sendIt(null, response)).catch((error) => sendIt(error, null));
       }

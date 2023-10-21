@@ -7,7 +7,7 @@ import {
 
 export type IDebug = (msg: any, stack?: any) => void;
 
-export type SLSHandler = (event, ctx, cb) => void;
+export type SLSHandler = (() => Promise<any>) | (() => (event: any, context: any) => void);
 
 export interface ISNSAdapter {
   listTopics(): Promise<ListTopicsCommandOutput>;

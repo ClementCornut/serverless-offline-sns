@@ -12,6 +12,7 @@ import get from "lodash/fp/get.js";
 import has from "lodash/fp/has.js";
 import type http from "http";
 import Serverless from "serverless";
+import URL from "url";
 
 import { loadServerlessConfig } from "./sls-config-parser.js";
 
@@ -78,7 +79,11 @@ export default class ServerlessOfflineSns {
   }
 
   public init() {
-    process.env = _.extend({}, process.env);
+    const env = {};
+    for (const funcKey in this.serverless.service.functions) {
+      env[funcKey] = this.serverless.service.functions[funcKey].environment;
+    }
+    process.env = _.extend({ AWS_REGION: this.serverless.service.provider.region }, env, process.env);
     this.config = this.serverless.service.custom["serverless-offline-sns"] || {};
     this.localPort = this.config.port || this.config.localPort || 4002;
     this.remotePort = this.config.port || this.config.remotePort || 4002;
@@ -436,7 +441,7 @@ export default class ServerlessOfflineSns {
   }
 
   public createJavascriptHandler(fn, location) {
-    return () => {
+    return async () => {
       // Options are passed from the command line in the options parameter
       // ### OLD: use the main serverless config since this behavior is already supported there
       // if (!this.options.skipCacheInvalidation || Array.isArray(this.options.skipCacheInvalidation)) {
@@ -462,9 +467,9 @@ export default class ServerlessOfflineSns {
       const handlerFnNameIndex = fn.handler.lastIndexOf(".");
       const handlerPath = fn.handler.substring(0, handlerFnNameIndex);
       const handlerFnName = fn.handler.substring(handlerFnNameIndex + 1);
-      const fullHandlerPath = resolve(location, handlerPath);
-      this.debug("require(" + fullHandlerPath + ")[" + handlerFnName + "]");
-      const handler = require(fullHandlerPath)[handlerFnName];
+      const fullHandlerPath = `${resolve(location, handlerPath)}.js`;
+      this.debug("import(" + URL.pathToFileURL(fullHandlerPath).toString() + ")[" + handlerFnName + "]");
+      const { [handlerFnName]: handler } = await import(URL.pathToFileURL(fullHandlerPath).toString());
       return handler;
     };
   }
